@@ -1,17 +1,18 @@
-// app/api/score-interview/route.js
+// app/api/score-interview/route.js - Optimized for Edge Runtime
 import { OpenAI } from 'openai';
+
+// Enable Edge Runtime to avoid timeout issues
+export const runtime = 'edge';
 
 // Initialize OpenAI client with a check for the API key
 const oak = process.env.OPENAI_API_KEY;
 let openai;
 
 try {
-  if (oak && oak !== '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') {
+  if (oak && oak !== 'your_openai_api_key_here') {
     openai = new OpenAI({
       apiKey: oak,
     });
-  } else {
-    console.warn('OpenAI API key is missing or using the default placeholder value');
   }
 } catch (error) {
   console.error('Error initializing OpenAI client:', error);
@@ -19,14 +20,10 @@ try {
 
 export async function POST(request) {
   try {
-    console.log('Score interview API called');
-    
     let data;
     try {
       data = await request.json();
-      console.log('Request data parsed successfully');
     } catch (parseError) {
-      console.error('Error parsing request JSON:', parseError);
       return Response.json(
         { error: 'Invalid JSON in request' },
         { status: 400 }
@@ -41,93 +38,59 @@ export async function POST(request) {
       averageResponseTimeMs 
     } = data;
     
-    // Validate required fields
-    if (!interview) {
-      console.warn('Missing interview transcript in request');
-    }
-    
-    if (!jobDescription) {
-      console.warn('Missing job description in request');
-    }
-    
-    if (!responseTimeData || !averageResponseTimeMs) {
-      console.warn('Missing response time data in request');
-    }
-    
-    // Convert response time from milliseconds to seconds for easier interpretation
+    // Convert response time from milliseconds to seconds
     const averageResponseTime = Math.round((averageResponseTimeMs || 0) / 1000);
-    
-    console.log('Average response time:', averageResponseTime, 'seconds');
     
     // If OpenAI is not initialized or we're missing data, return mock data
     if (!openai || !oak || oak === 'your_openai_api_key_here') {
-      console.log('Using mock scoring data (OpenAI API key not set)');
       return Response.json(getMockScore(averageResponseTime, averageResponseTimeMs));
     }
     
     try {
-      // Attempt to use OpenAI for scoring
-      console.log('Preparing to call OpenAI API for scoring...');
-      
       // Format response time data for AI analysis
-      const formattedResponseTimes = Object.entries(responseTimeData || {}).map(
-        ([questionIndex, timeMs]) => `Question ${parseInt(questionIndex) + 1}: ${Math.round(timeMs / 1000)} seconds`
-      ).join('\n');
+      const formattedResponseTimes = Object.entries(responseTimeData || {})
+        .slice(0, 3) // Limit to first 3 questions for brevity
+        .map(([questionIndex, timeMs]) => 
+          `Question ${parseInt(questionIndex) + 1}: ${Math.round(timeMs / 1000)} seconds`
+        ).join('\n');
       
-      // Construct prompt for AI scoring
+      // Construct optimized prompt for AI scoring
       const prompt = `
-        You are an expert interviewer and recruiter. Evaluate the following interview based on the job description, candidate's CV, and the interview transcript.
+        Evaluate this interview. Be concise.
         
-        Job Description:
-        ${jobDescription || 'Not provided'}
+        Job: ${jobDescription ? jobDescription.substring(0, 500) + '...' : 'Not provided'}
         
-        Candidate CV Summary:
-        ${cvContent ? (cvContent.substring(0, 1500) + '... (truncated if longer)') : 'Not provided'}
+        CV: ${cvContent ? cvContent.substring(0, 500) + '...' : 'Not provided'}
         
-        Interview Transcript:
-        ${interview || 'Not provided'}
+        Interview: ${interview ? interview.substring(0, 800) + '...' : 'Not provided'}
         
-        Response Time Data:
         Average response time: ${averageResponseTime} seconds
-        ${formattedResponseTimes || 'No detailed response time data available'}
+        ${formattedResponseTimes}
         
-        Please provide a comprehensive evaluation of the candidate's performance based on:
-        1. Technical Acumen: How well they demonstrated technical skills required for the role
-        2. Communication Skills: Clarity and effectiveness in conveying information
-        3. Problem-Solving & Adaptability: How they approached questions and provided solutions
-        4. Cultural Fit & Soft Skills: Interpersonal qualities relevant to the role
-        5. Response Timing: Considering their average response time of ${averageResponseTime} seconds (faster, high-quality responses should be scored higher)
-        
-        Return your evaluation as a JSON object with the following structure:
+        Return ONLY a JSON object with:
         {
           "overallScore": number (0-100),
           "categories": [
-            {
-              "name": "Technical Acumen",
-              "score": number (0-100),
-              "description": "Brief evaluation of this aspect",
-              "color": "bg-green-500" or "bg-yellow-500" or "bg-red-500" based on score
-            },
-            // Same structure for other categories
+            {"name": "Technical Acumen", "score": number, "description": "brief", "color": "bg-green/yellow/red-500"},
+            {"name": "Communication", "score": number, "description": "brief", "color": "bg-green/yellow/red-500"},
+            {"name": "Problem-Solving", "score": number, "description": "brief", "color": "bg-green/yellow/red-500"},
+            {"name": "Cultural Fit", "score": number, "description": "brief", "color": "bg-green/yellow/red-500"},
+            {"name": "Response Time", "score": number, "description": "brief", "color": "bg-green/yellow/red-500"}
           ],
-          "summary": "A concise paragraph summarizing overall performance",
-          "strengths": ["Strength 1", "Strength 2", "Strength 3"],
-          "improvements": ["Area for improvement 1", "Area for improvement 2", "Area for improvement 3"],
-          "averageResponseTime": number (in milliseconds, use the provided value)
+          "summary": "paragraph",
+          "strengths": ["str1", "str2", "str3"],
+          "improvements": ["imp1", "imp2", "imp3"]
         }
-        
-        Only return the JSON object, nothing else.
       `;
       
-      // Make the actual OpenAI API call
-      console.log('Calling OpenAI API...');
+      // Make the OpenAI API call with limited tokens
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini", // You can use "gpt-4" for better results if available
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
+        max_tokens: 1024, // Limit token generation for faster response
       });
       
-      console.log('OpenAI API response received');
       // Parse the AI's response
       const content = completion.choices[0].message.content;
       let scoreData;
@@ -155,28 +118,21 @@ export async function POST(request) {
           }
           return category;
         });
-        
-        console.log('Score data processed successfully');
       } catch (parseError) {
-        console.error('Error parsing AI response:', parseError);
-        console.log('Falling back to mock scoring data due to parse error');
         return Response.json(getMockScore(averageResponseTime, averageResponseTimeMs));
       }
       
       return Response.json(scoreData);
       
     } catch (openaiError) {
-      console.error('OpenAI API Error:', openaiError);
-      console.log('Falling back to mock scoring data due to OpenAI error');
       return Response.json(getMockScore(averageResponseTime, averageResponseTimeMs));
     }
     
   } catch (error) {
-    console.error('Error in score-interview route:', error);
     // Always return a valid response, even in case of errors
     return Response.json(
       getMockScore(0, 0, "Error processing request: " + error.message),
-      { status: 200 } // Return 200 with mock data instead of 500
+      { status: 200 }
     );
   }
 }

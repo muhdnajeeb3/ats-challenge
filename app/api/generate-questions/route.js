@@ -1,17 +1,16 @@
-// app/api/generate-questions/route.js
-// import { NextResponse } from 'next/server';
+// app/api/generate-questions/route.js - Optimized for Edge Runtime
 import { OpenAI } from 'openai';
 import { parseCV } from '@/lib/parser';
 
-// Initialize OpenAI client with a check for the API key
+// Enable Edge Runtime to avoid timeout issues
+export const runtime = 'edge';
+
+// Initialize OpenAI client with API key
 const oak = process.env.OPENAI_API_KEY;
 let openai;
 
 try {
-  if (!oak || oak === 'your_openai_api_key_here') {
-    console.warn('OpenAI API key is missing or using the default placeholder value');
-    // We'll handle this in the route function
-  } else {
+  if (oak && oak !== 'your_openai_api_key_here') {
     openai = new OpenAI({
       apiKey: oak,
     });
@@ -34,72 +33,57 @@ export async function POST(request) {
     }
     
     try {
-      console.log('Attempting to parse CV...');
       // Parse the CV file
       const cvContent = await parseCV(cvFile);
-      console.log('CV parsed successfully. Length:', cvContent.length);
       
       // If OpenAI isn't initialized or we're missing the API key, use mock data
       if (!openai || !oak || oak === 'your_openai_api_key_here') {
-        console.log('Using mock questions (OpenAI API key not set)');
         return Response.json({
-          questions: getMockQuestions(jobDescription),
+          questions: getMockQuestions(),
           cvContent,
           note: "Using mock data - OpenAI API key not configured"
         });
       }
       
-      // Generate interview questions using OpenAI
-      console.log('Preparing to call OpenAI API...');
+      // Optimize the prompt for faster processing
       const prompt = `
-        I need to generate personalized interview questions based on a job description and a candidate's CV.
+        Generate 5 personalized interview questions based on this job description and CV.
         
-        Job Description:
-        ${jobDescription}
+        Job Description (summary):
+        ${jobDescription.substring(0, 800)}...
         
-        Candidate CV:
-        ${cvContent}
+        Candidate CV (summary):
+        ${cvContent.substring(0, 800)}...
         
-        Create 5-7 specific interview questions that:
-        1. Evaluate the candidate's qualifications for this specific job
-        2. Address potential gaps between the job requirements and candidate's experience
-        3. Include a mix of technical, behavioral, and situational questions
-        4. Are personalized to the candidate's background
-        
-        Format the questions as a JSON array of objects with the following properties:
-        - id: A unique identifier (number)
-        - question: The interview question text
-        - category: The category of question (technical, behavioral, situational)
-        - relevance: A brief note explaining why this question is relevant
-        
-        Only return the JSON array, nothing else.
+        Return ONLY a JSON array with objects having these properties:
+        - id: number
+        - question: string (the interview question)
+        - category: string (technical, behavioral, or situational)
+        - relevance: string (brief explanation why relevant)
       `;
       
       try {
-        // Make the actual OpenAI API call
-        console.log('Calling OpenAI API...');
+        // Make the OpenAI API call with a shorter timeout
         const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini", // You can use "gpt-4" for better results if available
+          model: "gpt-4o-mini",
           messages: [{ role: "user", content: prompt }],
           temperature: 0.7,
+          max_tokens: 1024, // Limit token generation for faster response
         });
         
-        console.log('OpenAI API response received');
         // Parse the response to get questions
         const content = completion.choices[0].message.content;
         let questions;
         
         try {
-          // Extract JSON from response if needed
+          // Extract JSON from response
           const jsonMatch = content.match(/\[[\s\S]*\]/);
           questions = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
-          console.log(`Successfully parsed ${questions.length} questions from OpenAI response`);
         } catch (parseError) {
-          console.error('Error parsing OpenAI response:', parseError);
-          console.log('Raw OpenAI response:', content);
           // Fallback to mock questions if parsing fails
-          questions = getMockQuestions(jobDescription);
-          console.log('Using mock questions due to parse error');
+          console.log(parseError);
+          
+          questions = getMockQuestions();
         }
         
         return Response.json({
@@ -108,17 +92,15 @@ export async function POST(request) {
         });
         
       } catch (openaiError) {
-        console.error('OpenAI API Error:', openaiError);
         // Fallback to mock questions if OpenAI call fails
         return Response.json({
-          questions: getMockQuestions(jobDescription),
+          questions: getMockQuestions(),
           cvContent,
           note: "Using mock data due to OpenAI API error: " + openaiError.message
         });
       }
       
     } catch (cvError) {
-      console.error('Error processing CV:', cvError);
       // Return a more specific error with the actual error message
       return Response.json(
         { error: `CV processing error: ${cvError.message}` },
@@ -127,7 +109,6 @@ export async function POST(request) {
     }
     
   } catch (requestError) {
-    console.error('Error processing request:', requestError);
     return Response.json(
       { error: `Request processing error: ${requestError.message}` },
       { status: 500 }
@@ -135,7 +116,7 @@ export async function POST(request) {
   }
 }
 
-// Function to generate mock questions based on job description
+// Function to generate mock questions
 function getMockQuestions() {
   return [
     {

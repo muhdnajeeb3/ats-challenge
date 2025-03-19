@@ -50,29 +50,103 @@ export default function UploadForm() {
       formData.append('jobDescription', data.jobDescription);
       formData.append('cvFile', file);
       
-      // Send to backend API
-      const response = await fetch('/api/generate-questions', {
-        method: 'POST',
-        body: formData,
-      });
+      // Create a timeout controller for the fetch request
+      const timeoutController = new AbortController();
+      const timeoutId = setTimeout(() => timeoutController.abort(), 15000); // 15 second timeout
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to generate questions: ${response.status} ${errorText}`);
+      try {
+        // Send to backend API with timeout
+        const response = await fetch('/api/generate-questions', {
+          method: 'POST',
+          body: formData,
+          signal: timeoutController.signal
+        });
+        
+        // Clear the timeout since the request completed
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to generate questions: ${response.status} ${errorText}`);
+        }
+        
+        const result = await response.json();
+        
+        // Store data in localStorage for use in interview page
+        localStorage.setItem('interviewData', JSON.stringify({
+          jobDescription: data.jobDescription,
+          candidateName: data.candidateName,
+          questions: result.questions,
+          cvContent: result.cvContent
+        }));
+        
+        // Navigate to interview page
+        router.push('/interview');
+      } catch (fetchError) {
+        // Handle timeout or other fetch errors
+        console.error('Fetch error:', fetchError);
+        
+        if (fetchError.name === 'AbortError') {
+          console.log('Request timed out, using mock data');
+          
+          // Use mock data if request times out
+          const mockQuestions = [
+            {
+              id: 1,
+              question: "Tell me about your experience with web development frameworks and technologies.",
+              category: "technical",
+              relevance: "Understanding the candidate's technical background"
+            },
+            {
+              id: 2,
+              question: "How have you integrated APIs or external services in your previous projects?",
+              category: "technical",
+              relevance: "Assessing experience with system integration"
+            },
+            {
+              id: 3,
+              question: "Describe a challenging project and how you overcame obstacles during development.",
+              category: "behavioral",
+              relevance: "Evaluating problem-solving abilities and perseverance"
+            },
+            {
+              id: 4,
+              question: "How do you prioritize tasks when working under tight deadlines?",
+              category: "situational",
+              relevance: "Assessing time management and work prioritization skills"
+            },
+            {
+              id: 5,
+              question: "How do you stay updated with the latest trends and technologies in your field?",
+              category: "behavioral",
+              relevance: "Gauging commitment to continuous learning and improvement"
+            }
+          ];
+          
+          // Create mock CV content - simplified for brevity
+          const mockCV = `${data.candidateName}\nExperienced professional with skills in web development.`;
+          
+          // Store mock data and continue with the flow
+          localStorage.setItem('interviewData', JSON.stringify({
+            jobDescription: data.jobDescription,
+            candidateName: data.candidateName,
+            questions: mockQuestions,
+            cvContent: mockCV
+          }));
+          
+          setApiError('Request timed out. Using mock data to continue.');
+          
+          // Show message briefly before redirecting
+          setTimeout(() => {
+            router.push('/interview');
+          }, 2000);
+          
+          return;
+        }
+        
+        // Handle other errors
+        setApiError(`Request failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
       }
-      
-      const result = await response.json();
-      
-      // Store data in localStorage for use in interview page
-      localStorage.setItem('interviewData', JSON.stringify({
-        jobDescription: data.jobDescription,
-        candidateName: data.candidateName,
-        questions: result.questions,
-        cvContent: result.cvContent
-      }));
-      
-      // Navigate to interview page
-      router.push('/interview');
     } catch (error) {
       console.error('Error generating interview questions:', error);
       setApiError(`Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -86,7 +160,7 @@ export default function UploadForm() {
       <h1 className="text-2xl font-bold mb-6">AI Interview Assistant</h1>
       
       {apiError && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+        <div className="mb-4 p-3 bg-yellow-100 text-yellow-700 rounded-md">
           <p>{apiError}</p>
         </div>
       )}
