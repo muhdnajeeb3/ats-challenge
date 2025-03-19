@@ -4,16 +4,16 @@ import { OpenAI } from 'openai';
 import { parseCV } from '@/lib/parser';
 
 // Initialize OpenAI client with a check for the API key
-const openaiApiKey = process.env.OPENAI_API_KEY;
+const oak = process.env.OPENAI_API_KEY;
 let openai;
 
 try {
-  if (!openaiApiKey || openaiApiKey === 'your_openai_api_key_here') {
+  if (!oak || oak === 'your_openai_api_key_here') {
     console.warn('OpenAI API key is missing or using the default placeholder value');
     // We'll handle this in the route function
   } else {
     openai = new OpenAI({
-      apiKey: openaiApiKey,
+      apiKey: oak,
     });
   }
 } catch (error) {
@@ -40,7 +40,7 @@ export async function POST(request) {
       console.log('CV parsed successfully. Length:', cvContent.length);
       
       // If OpenAI isn't initialized or we're missing the API key, use mock data
-      if (!openai || !openaiApiKey || openaiApiKey === 'your_openai_api_key_here') {
+      if (!openai || !oak || oak === 'your_openai_api_key_here') {
         console.log('Using mock questions (OpenAI API key not set)');
         return Response.json({
           questions: getMockQuestions(jobDescription),
