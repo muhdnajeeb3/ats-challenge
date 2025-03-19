@@ -1,49 +1,58 @@
-// lib/parser.ts
-// Replace 'any' with a more specific type
-
 export async function parseCV(file: File): Promise<string> {
   try {
-    console.log('Starting CV parsing process');
-    console.log('File type:', file.type);
-    console.log('File name:', file.name);
-    console.log('File size:', file.size, 'bytes');
-    
-    // Get file extension
+    console.log('Parsing file:', file.name, file.type, file.size);
+
     const fileType = file.name.split('.').pop()?.toLowerCase() || '';
-    console.log('Detected file extension:', fileType);
-    
-    // For now, we'll use a simplified approach for all file types
-    // This should work for text files and provide fallback for others
-    try {
-      let text = '';
-      
-      if (file.type === 'text/plain' || fileType === 'txt') {
-        console.log('Parsing as text file');
-        text = await file.text();
-        console.log('Text file parsed, content length:', text.length);
-      } else {
-        console.log('File is not plaintext, using mock CV data');
-        // For now, just return mock data for non-text files
-        text = getMockCV();
-        console.log('Using mock CV data, length:', text.length);
+    let text = '';
+
+    if (fileType === 'txt') {
+      text = await file.text();
+      console.log('TXT file read successfully, length:', text.length);
+    } 
+    else if (fileType === 'pdf') {
+      try {
+        if (typeof window !== 'undefined') {
+          console.warn('PDF parsing is not supported in the browser');
+          return getMockCV(file.name);
+        }
+
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = new Uint8Array(arrayBuffer);
+
+        // Dynamically import pdf-parse **only on the server**
+        const pdfParse = (await import('pdf-parse')).default;
+        const pdfData = await pdfParse(buffer);
+        text = pdfData.text;
+        console.log('PDF parsed successfully, length:', text.length);
+      } catch (pdfError) {
+        console.error('PDF parsing error:', pdfError);
+        return getMockCV(file.name);
       }
-      
-      // Clean the text
-      const cleanedText = cleanText(text);
-      console.log('Text cleaned, final length:', cleanedText.length);
-      
-      return cleanedText;
-    } catch (readError) {
-      console.error('Error reading file:', readError);
-      console.log('Falling back to mock CV');
-      return getMockCV();
+    } 
+    else if (fileType === 'docx') {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const mammoth = await import('mammoth') as typeof import('mammoth');
+        const docxResult = await mammoth.extractRawText({ arrayBuffer });
+        text = docxResult.value;
+        console.log('DOCX parsed successfully, length:', text.length);
+      } catch (docxError) {
+        console.error('DOCX parsing error:', docxError);
+        return getMockCV(file.name);
+      }
+    } 
+    else {
+      console.warn('Unsupported file type:', fileType);
+      return getMockCV(file.name);
     }
+
+    return text.trim().length > 0 ? cleanText(text) : getMockCV(file.name);
   } catch (error) {
-    console.error('Error in parseCV function:', error);
-    // Return mock data to allow the application to continue functioning
+    console.error('Error parsing CV:', error);
     return getMockCV();
   }
 }
+
 
 function cleanText(text: string | null | undefined): string {
   // Basic cleaning
@@ -51,7 +60,7 @@ function cleanText(text: string | null | undefined): string {
     console.warn('Empty text received for cleaning');
     return '';
   }
-  
+
   try {
     const cleaned = text
       .replace(/\r\n/g, '\n')
@@ -60,7 +69,7 @@ function cleanText(text: string | null | undefined): string {
       .replace(/\t+/g, ' ')
       .replace(/ +/g, ' ')
       .trim();
-    
+
     return cleaned;
   } catch (error) {
     console.error('Error cleaning text:', error);
@@ -68,9 +77,22 @@ function cleanText(text: string | null | undefined): string {
   }
 }
 
-function getMockCV(): string {
-  return `John Doe
-Email: john@example.com
+function getMockCV(filename = ''): string {
+  // Extract a name from the filename if possible
+  let name = "John Doe";
+  if (filename) {
+    // Try to get a name from the filename (remove extension)
+    const namePart = filename.split('.')[0];
+    if (namePart && namePart.length > 0) {
+      // Replace underscores/dashes with spaces and capitalize words
+      name = namePart
+        .replace(/[_-]/g, ' ')
+        .replace(/\w\S*/g, w => (w.charAt(0).toUpperCase() + w.substr(1).toLowerCase()));
+    }
+  }
+
+  return `${name}
+Email: ${name.toLowerCase().replace(/\s/g, '.')}@example.com
 Phone: (555) 123-4567
 
 SUMMARY
