@@ -13,6 +13,8 @@ try {
     openai = new OpenAI({
       apiKey: oak,
     });
+  } else {
+    console.warn('OpenAI API key is missing or using the default placeholder value');
   }
 } catch (error) {
   console.error('Error initializing OpenAI client:', error);
@@ -20,10 +22,14 @@ try {
 
 export async function POST(request) {
   try {
+    console.log('Score interview API called');
+    
     let data;
     try {
       data = await request.json();
-    } catch (parseError) {
+      console.log('Request data parsed successfully');
+    } catch (error) {
+      console.error('Error parsing JSON:', error);
       return Response.json(
         { error: 'Invalid JSON in request' },
         { status: 400 }
@@ -38,15 +44,34 @@ export async function POST(request) {
       averageResponseTimeMs 
     } = data;
     
-    // Convert response time from milliseconds to seconds
+    // Validate required fields
+    if (!interview) {
+      console.warn('Missing interview transcript in request');
+    }
+    
+    if (!jobDescription) {
+      console.warn('Missing job description in request');
+    }
+    
+    if (!responseTimeData || !averageResponseTimeMs) {
+      console.warn('Missing response time data in request');
+    }
+    
+    // Convert response time from milliseconds to seconds for easier interpretation
     const averageResponseTime = Math.round((averageResponseTimeMs || 0) / 1000);
+    
+    console.log('Average response time:', averageResponseTime, 'seconds');
     
     // If OpenAI is not initialized or we're missing data, return mock data
     if (!openai || !oak || oak === 'your_openai_api_key_here') {
+      console.log('Using mock scoring data (OpenAI API key not set)');
       return Response.json(getMockScore(averageResponseTime, averageResponseTimeMs));
     }
     
     try {
+      // Attempt to use OpenAI for scoring
+      console.log('Preparing to call OpenAI API for scoring...');
+      
       // Format response time data for AI analysis
       const formattedResponseTimes = Object.entries(responseTimeData || {})
         .slice(0, 3) // Limit to first 3 questions for brevity
@@ -119,20 +144,25 @@ export async function POST(request) {
           return category;
         });
       } catch (parseError) {
+        // Use the error for logging
+        console.error('Error parsing JSON response:', parseError);
         return Response.json(getMockScore(averageResponseTime, averageResponseTimeMs));
       }
       
       return Response.json(scoreData);
       
-    } catch (openaiError) {
+    } catch (apiError) {
+      // Use the error for logging
+      console.error('OpenAI API Error:', apiError);
       return Response.json(getMockScore(averageResponseTime, averageResponseTimeMs));
     }
     
   } catch (error) {
+    console.error('Error in score-interview route:', error);
     // Always return a valid response, even in case of errors
     return Response.json(
       getMockScore(0, 0, "Error processing request: " + error.message),
-      { status: 200 }
+      { status: 200 } // Return 200 with mock data instead of 500
     );
   }
 }

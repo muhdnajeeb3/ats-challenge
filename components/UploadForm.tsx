@@ -82,74 +82,87 @@ export default function UploadForm() {
         
         // Navigate to interview page
         router.push('/interview');
-      } catch (fetchError) {
-        // Handle timeout or other fetch errors
-        console.error('Fetch error:', fetchError);
+      } catch (error: unknown) {
+        // Handle timeout or other fetch errors - with proper typing
+        console.error('Fetch error:', error);
         
-        if (fetchError.name === 'AbortError') {
-          console.log('Request timed out, using mock data');
+        // Type guard: check if error is an Error object
+        if (error instanceof Error) {
+          // Now TypeScript knows error is an Error object
           
-          // Use mock data if request times out
-          const mockQuestions = [
-            {
-              id: 1,
-              question: "Tell me about your experience with web development frameworks and technologies.",
-              category: "technical",
-              relevance: "Understanding the candidate's technical background"
-            },
-            {
-              id: 2,
-              question: "How have you integrated APIs or external services in your previous projects?",
-              category: "technical",
-              relevance: "Assessing experience with system integration"
-            },
-            {
-              id: 3,
-              question: "Describe a challenging project and how you overcame obstacles during development.",
-              category: "behavioral",
-              relevance: "Evaluating problem-solving abilities and perseverance"
-            },
-            {
-              id: 4,
-              question: "How do you prioritize tasks when working under tight deadlines?",
-              category: "situational",
-              relevance: "Assessing time management and work prioritization skills"
-            },
-            {
-              id: 5,
-              question: "How do you stay updated with the latest trends and technologies in your field?",
-              category: "behavioral",
-              relevance: "Gauging commitment to continuous learning and improvement"
-            }
-          ];
+          // Check for AbortError (timeout)
+          if (error.name === 'AbortError') {
+            console.log('Request timed out, using mock data');
+            
+            // Use mock data if request times out
+            const mockQuestions = [
+              {
+                id: 1,
+                question: "Tell me about your experience with web development frameworks and technologies.",
+                category: "technical",
+                relevance: "Understanding the candidate's technical background"
+              },
+              {
+                id: 2,
+                question: "How have you integrated APIs or external services in your previous projects?",
+                category: "technical",
+                relevance: "Assessing experience with system integration"
+              },
+              {
+                id: 3,
+                question: "Describe a challenging project and how you overcame obstacles during development.",
+                category: "behavioral",
+                relevance: "Evaluating problem-solving abilities and perseverance"
+              },
+              {
+                id: 4,
+                question: "How do you prioritize tasks when working under tight deadlines?",
+                category: "situational",
+                relevance: "Assessing time management and work prioritization skills"
+              },
+              {
+                id: 5,
+                question: "How do you stay updated with the latest trends and technologies in your field?",
+                category: "behavioral",
+                relevance: "Gauging commitment to continuous learning and improvement"
+              }
+            ];
+            
+            // Create mock CV content - simplified for brevity
+            const mockCV = `${data.candidateName}\nExperienced professional with skills in web development.`;
+            
+            // Store mock data and continue with the flow
+            localStorage.setItem('interviewData', JSON.stringify({
+              jobDescription: data.jobDescription,
+              candidateName: data.candidateName,
+              questions: mockQuestions,
+              cvContent: mockCV
+            }));
+            
+            setApiError('Request timed out. Using mock data to continue.');
+            
+            // Show message briefly before redirecting
+            setTimeout(() => {
+              router.push('/interview');
+            }, 2000);
+            
+            return;
+          }
           
-          // Create mock CV content - simplified for brevity
-          const mockCV = `${data.candidateName}\nExperienced professional with skills in web development.`;
-          
-          // Store mock data and continue with the flow
-          localStorage.setItem('interviewData', JSON.stringify({
-            jobDescription: data.jobDescription,
-            candidateName: data.candidateName,
-            questions: mockQuestions,
-            cvContent: mockCV
-          }));
-          
-          setApiError('Request timed out. Using mock data to continue.');
-          
-          // Show message briefly before redirecting
-          setTimeout(() => {
-            router.push('/interview');
-          }, 2000);
-          
-          return;
+          // Handle other error types
+          setApiError(`Request failed: ${error.message}`);
+        } else {
+          // Handle non-Error objects
+          setApiError('Request failed: Unknown error');
         }
-        
-        // Handle other errors
-        setApiError(`Request failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error generating interview questions:', error);
-      setApiError(`Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      if (error instanceof Error) {
+        setApiError(`Request failed: ${error.message}`);
+      } else {
+        setApiError('Request failed: Unknown error');
+      }
     } finally {
       setIsLoading(false);
     }
