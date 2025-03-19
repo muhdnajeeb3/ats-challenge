@@ -1,5 +1,5 @@
 // lib/parser.js
-export async function parseCV(file) {
+export async function parseCV(file : any) {
     try {
       // For development/testing, we'll use a simple text extraction
       // In production, you would use pdf-parse and mammoth libraries
@@ -16,7 +16,7 @@ export async function parseCV(file) {
     }
   }
   
-  async function readFileAsText(file) {
+  async function readFileAsText(file : File) {
     // Simple implementation to read text files
     // For PDFs and DOCXs, you would use the proper libraries
     try {
@@ -32,7 +32,7 @@ export async function parseCV(file) {
     }
   }
   
-  function cleanText(text) {
+  function cleanText(text: string | null | undefined) {
     // Basic cleaning
     if (!text) return '';
     

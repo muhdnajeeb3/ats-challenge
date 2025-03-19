@@ -122,7 +122,7 @@ export async function POST(request) {
       // Make the actual OpenAI API call
       console.log('Calling OpenAI API...');
       const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo", // You can use "gpt-4" for better results if available
+        model: "gpt-4o-mini", // You can use "gpt-4" for better results if available
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
       });
