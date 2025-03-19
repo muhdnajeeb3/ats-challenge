@@ -2,13 +2,13 @@
 import { OpenAI } from 'openai';
 
 // Initialize OpenAI client with a check for the API key
-const openaiApiKey = process.env.OPENAI_API_KEY;
+const oak = process.env.OPENAI_API_KEY;
 let openai;
 
 try {
-  if (openaiApiKey && openaiApiKey !== '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') {
+  if (oak && oak !== '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') {
     openai = new OpenAI({
-      apiKey: openaiApiKey,
+      apiKey: oak,
     });
   } else {
     console.warn('OpenAI API key is missing or using the default placeholder value');
@@ -60,7 +60,7 @@ export async function POST(request) {
     console.log('Average response time:', averageResponseTime, 'seconds');
     
     // If OpenAI is not initialized or we're missing data, return mock data
-    if (!openai || !openaiApiKey || openaiApiKey === 'your_openai_api_key_here') {
+    if (!openai || !oak || oak === 'your_openai_api_key_here') {
       console.log('Using mock scoring data (OpenAI API key not set)');
       return Response.json(getMockScore(averageResponseTime, averageResponseTimeMs));
     }
